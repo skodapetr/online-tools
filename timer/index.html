@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timer</title>
+<script>
+  // Apply the saved theme before first paint to avoid a flash.
+  try {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+  } catch (error) { /* storage unavailable */ }
+</script>
+<style>
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #f5f5f5;
+  --fg: #111;
+  --code-bg: #e0e0e0;
+  --done: #e74c3c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111;
+    --fg: #eee;
+    --code-bg: #222;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #111;
+  --fg: #eee;
+  --code-bg: #222;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Courier New', monospace;
+  transition: background 0.3s, color 0.3s;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.timer {
+  font-size: clamp(5rem, 20vw, 12rem);
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.7s;
+}
+
+.timer.done {
+  color: var(--done);
+}
+
+.error {
+  font-size: 1.2rem;
+  color: var(--done);
+  padding: 0 1rem;
+  text-align: center;
+}
+
+.error code {
+  background: var(--code-bg);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+}
+
+.reset-button {
+  font-size: 1.2rem;
+  padding: 0.75rem 2rem;
+  background: none;
+  border: 2px solid var(--fg);
+  color: var(--fg);
+  cursor: pointer;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  transition: background 0.2s, color 0.2s;
+}
+
+.reset-button:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.reset-button[hidden] {
+  display: none;
+}
+
+.theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--fg);
+  padding: 0.5rem;
+  border-radius: 50%;
+  line-height: 0;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.theme-toggle:hover {
+  opacity: 1;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body, .timer, .reset-button, .theme-toggle {
+    transition: none;
+  }
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  const SUN_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+
+  const MOON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
+  const TICK_INTERVAL_MS = 250;
+
+  mount(document.getElementById('app'));
+
+  function mount(element) {
+    setupThemeToggle();
+
+    const { seconds } = readUrlQuery();
+    if (isNaN(seconds) || seconds <= 0) {
+      renderInvalidInput(element);
+      return;
+    }
+
+    const display = document.createElement('div');
+    display.className = 'timer';
+    display.setAttribute('role', 'timer');
+    element.appendChild(display);
+
+    const resetButton = document.createElement('button');
+    resetButton.className = 'reset-button';
+    resetButton.textContent = 'Restart';
+    resetButton.hidden = true;
+    element.appendChild(resetButton);
+
+    let intervalId = null;
+
+    function startCountdown() {
+      clearInterval(intervalId);
+      // Count against a fixed deadline so the timer stays accurate even when
+      // the browser throttles intervals (e.g. in a background tab).
+      const deadline = Date.now() + seconds * 1000;
+      display.classList.remove('done');
+      resetButton.hidden = true;
+      updateTimerElement(display, seconds);
+
+      intervalId = setInterval(() => {
+        const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        updateTimerElement(display, remaining);
+        if (remaining === 0) {
+          clearInterval(intervalId);
+          resetButton.hidden = false;
+          resetButton.focus();
+        }
+      }, TICK_INTERVAL_MS);
+    }
+
+    resetButton.addEventListener('click', startCountdown);
+
+    startCountdown();
+  }
+
+  function setupThemeToggle() {
+    const saved = readStoredTheme();
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const current = saved ?? (prefersDark ? 'dark' : 'light');
+    document.documentElement.dataset.theme = current;
+
+    const button = document.createElement('button');
+    button.className = 'theme-toggle';
+    updateToggleButton(button, current);
+
+    button.addEventListener('click', () => {
+      const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = next;
+      storeTheme(next);
+      updateToggleButton(button, next);
+    });
+
+    document.body.appendChild(button);
+  }
+
+  function readStoredTheme() {
+    try {
+      const value = localStorage.getItem('theme');
+      return value === 'light' || value === 'dark' ? value : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function storeTheme(theme) {
+    try {
+      localStorage.setItem('theme', theme);
+    } catch (error) { /* storage unavailable */ }
+  }
+
+  function updateToggleButton(button, theme) {
+    if (theme === 'dark') {
+      button.innerHTML = SUN_ICON;
+      button.setAttribute('aria-label', 'Switch to light mode');
+    } else {
+      button.innerHTML = MOON_ICON;
+      button.setAttribute('aria-label', 'Switch to dark mode');
+    }
+  }
+
+  function readUrlQuery() {
+    const params = new URLSearchParams(window.location.search);
+    const seconds = parseInt(params.get('t') ?? '', 10);
+    return { seconds };
+  }
+
+  function renderInvalidInput(element) {
+    element.innerHTML = '<p class="error">Pass a countdown duration via <code>?t=seconds</code></p>';
+  }
+
+  function updateTimerElement(display, value) {
+    const text = formatAsTime(value);
+    if (display.textContent !== text) display.textContent = text;
+    if (value === 0) {
+      display.classList.add('done');
+    }
+  }
+
+  function formatAsTime(value) {
+    const hours = Math.floor(value / 3600);
+    const minutes = Math.floor((value % 3600) / 60);
+    const secondsPart = value % 60;
+    if (hours > 0) {
+      return `${hours}:${String(minutes).padStart(2, '0')}:${String(secondsPart).padStart(2, '0')}`;
+    }
+    return `${String(minutes).padStart(2, '0')}:${String(secondsPart).padStart(2, '0')}`;
+  }
+})();
+</script>
+</body>
+</html>
