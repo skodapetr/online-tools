@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Počítání hrou</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f7f7f7;
+  --text: #4b4b4b;
+  --text-strong: #3c3c3c;
+  --muted: #777777;
+  --faint: #afafaf;
+  --border: #e5e5e5;
+  --green: #58cc02;
+  --green-edge: #58a700;
+  --green-soft: #d7ffb8;
+  --green-ink: #58a700;
+  --red: #ff4b4b;
+  --red-edge: #ea2b2b;
+  --red-soft: #ffdfe0;
+  --red-ink: #ea2b2b;
+  --blue: #1cb0f6;
+  --blue-edge: #1899d6;
+  --blue-soft: #ddf4ff;
+  --blue-ink: #1899d6;
+  --orange: #ff9600;
+  --heart: #ff4b4b;
+  --disabled: #e5e5e5;
+  --disabled-ink: #afafaf;
+  --overlay: rgba(0, 0, 0, 0.45);
+  --icon-bg: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131f24;
+    --surface: #131f24;
+    --surface-2: #1a2a31;
+    --text: #dce6ec;
+    --text-strong: #f1f7fb;
+    --muted: #8fa3ad;
+    --faint: #52656d;
+    --border: #37464f;
+    --green-soft: #1d3312;
+    --green-ink: #79d634;
+    --red-soft: #3a1b1e;
+    --red-ink: #ff7878;
+    --blue-soft: #16344a;
+    --blue-ink: #49c0f8;
+    --disabled: #37464f;
+    --disabled-ink: #52656d;
+    --overlay: rgba(0, 0, 0, 0.65);
+    --icon-bg: #131f24;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131f24;
+  --surface: #131f24;
+  --surface-2: #1a2a31;
+  --text: #dce6ec;
+  --text-strong: #f1f7fb;
+  --muted: #8fa3ad;
+  --faint: #52656d;
+  --border: #37464f;
+  --green-soft: #1d3312;
+  --green-ink: #79d634;
+  --red-soft: #3a1b1e;
+  --red-ink: #ff7878;
+  --blue-soft: #16344a;
+  --blue-ink: #49c0f8;
+  --disabled: #37464f;
+  --disabled-ink: #52656d;
+  --overlay: rgba(0, 0, 0, 0.65);
+  --icon-bg: #131f24;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  font-family: "Nunito", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+}
+body.modal-open { overflow: hidden; }
+button { font-family: inherit; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Top bar ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px 4px;
+}
+.streak {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 58px;
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--orange);
+}
+.streak .flame { font-size: 22px; line-height: 1; }
+.streak.is-zero { color: var(--faint); }
+.streak.is-zero .flame { filter: grayscale(1); opacity: 0.55; }
+.streak.pop { animation: pop 0.45s ease-out; }
+.progress {
+  flex: 1;
+  height: 16px;
+  border-radius: 99px;
+  background: var(--border);
+  overflow: hidden;
+}
+.progress-fill {
+  position: relative;
+  height: 100%;
+  width: 0;
+  border-radius: 99px;
+  background: var(--green);
+  transition: width 0.45s ease;
+}
+.progress-fill::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 4px;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.3);
+}
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--border);
+  border-bottom-width: 4px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-btn:active { transform: translateY(2px); border-bottom-width: 2px; }
+.icon-btn svg { width: 22px; height: 22px; }
+
+/* ---------- Stage ---------- */
+.stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 16px 130px;
+}
+.greeting {
+  align-self: flex-start;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.task {
+  align-self: flex-start;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.mascot { width: 84px; flex: none; }
+.mascot svg { width: 100%; height: auto; display: block; overflow: visible; }
+.mascot.happy svg { animation: hop 0.6s ease-out; }
+.mascot .m-sad { display: none; }
+.mascot.sad .m-sad { display: inline; }
+.mascot.sad .m-happy { display: none; }
+.bubble {
+  position: relative;
+  margin-bottom: 34px;
+  padding: 10px 14px;
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-strong);
+}
+.bubble::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  bottom: 12px;
+  border-style: solid;
+  border-width: 8px 12px 8px 0;
+  border-color: transparent var(--border) transparent transparent;
+}
+.bubble::after {
+  content: "";
+  position: absolute;
+  left: -9px;
+  bottom: 14px;
+  border-style: solid;
+  border-width: 6px 9px 6px 0;
+  border-color: transparent var(--surface) transparent transparent;
+}
+
+.equation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.3em;
+  margin: 4px 0;
+  font-size: clamp(40px, 11vw, 60px);
+  font-weight: 900;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.equation.long { font-size: clamp(28px, 8vw, 44px); }
+.answer {
+  min-width: 1.7em;
+  padding: 0.06em 0.35em;
+  border: 3px solid var(--border);
+  border-bottom-width: 6px;
+  border-radius: 18px;
+  background: var(--surface-2);
+  text-align: center;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+.answer.focus { border-color: var(--blue); }
+.answer.empty { color: var(--faint); }
+.answer.ok { border-color: var(--green); background: var(--green-soft); color: var(--green-ink); }
+.answer.bad { border-color: var(--red); background: var(--red-soft); color: var(--red-ink); }
+.answer.shake { animation: shake 0.4s; }
+
+.hearts { display: flex; gap: 8px; }
+.heart { width: 28px; height: 28px; color: var(--heart); transition: color 0.2s, transform 0.2s; }
+.heart.lost { color: var(--border); transform: scale(0.85); }
+
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 340px;
+}
+.key {
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--border);
+  border-bottom-width: 5px;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: 28px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+}
+.key svg { width: 30px; height: 30px; }
+.key:active:not(:disabled), .key.pressed { transform: translateY(3px); border-bottom-width: 2px; }
+.key:disabled { opacity: 0.45; cursor: default; }
+.key.invisible { visibility: hidden; }
+
+/* ---------- Footer ---------- */
+.footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+  border-top: 2px solid var(--border);
+  background: var(--bg);
+  transition: background-color 0.2s;
+}
+.footer.is-ok { background: var(--green-soft); border-top-color: transparent; }
+.footer.is-bad { background: var(--red-soft); border-top-color: transparent; }
+.footer-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.fb { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.fb-icon {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--icon-bg);
+  font-size: 30px;
+  font-weight: 900;
+}
+.is-ok .fb-icon, .is-ok .fb-title, .is-ok .fb-sub { color: var(--green-ink); }
+.is-bad .fb-icon, .is-bad .fb-title, .is-bad .fb-sub { color: var(--red-ink); }
+.fb-title { font-size: 22px; font-weight: 900; }
+.fb-sub { font-size: 16px; font-weight: 700; }
+
+.btn {
+  min-height: 50px;
+  padding: 13px 24px;
+  border: none;
+  border-radius: 16px;
+  background: var(--green);
+  box-shadow: 0 4px 0 var(--green-edge);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.06); }
+.btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 0 0 transparent; }
+.btn-red { background: var(--red); box-shadow: 0 4px 0 var(--red-edge); }
+.btn:disabled {
+  background: var(--disabled);
+  box-shadow: none;
+  color: var(--disabled-ink);
+  cursor: default;
+}
+.btn-block { width: 100%; }
+#actionBtn { min-width: 180px; margin-left: auto; }
+
+/* ---------- Modal ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--overlay);
+}
+.modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 92vh;
+  max-height: min(92dvh, 780px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 8px;
+}
+.modal-head h2 { margin: 0; font-size: 24px; font-weight: 900; color: var(--text-strong); }
+.tabs { display: flex; gap: 8px; padding: 4px 20px 12px; }
+.tab {
+  flex: 1;
+  padding: 10px;
+  border: 2px solid var(--border);
+  border-bottom-width: 4px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.tab[aria-selected="true"] { border-color: var(--blue); background: var(--blue-soft); color: var(--blue-ink); }
+.panel { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 20px 20px; }
+
+.intro { margin: 0 0 18px; font-size: 17px; font-weight: 700; line-height: 1.45; }
+.field { display: block; margin-bottom: 18px; }
+.label { display: block; margin-bottom: 8px; font-size: 16px; font-weight: 900; color: var(--text-strong); }
+.hint { margin: 6px 0 0; font-size: 13px; font-weight: 700; color: var(--muted); }
+.text-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+}
+.text-input:focus { border-color: var(--blue); outline: none; }
+.op-list { display: flex; flex-direction: column; gap: 10px; }
+.op-card {
+  overflow: hidden;
+  border: 2px solid var(--border);
+  border-bottom-width: 4px;
+  border-radius: 16px;
+  background: var(--surface);
+  transition: border-color 0.15s;
+}
+.op-card.on { border-color: var(--blue); }
+.op-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+.op-toggle:focus-visible { outline-offset: -3px; }
+.op-card.on .op-toggle { background: var(--blue-soft); color: var(--blue-ink); }
+.op-name { flex: 1; }
+.op-check {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  color: transparent;
+  font-size: 16px;
+  font-weight: 900;
+}
+.op-card.on .op-check { border-color: var(--blue); background: var(--blue); color: #ffffff; }
+.op-body { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.op-body .hint { margin: 0; }
+.op-body .switch-row { margin-bottom: 0; }
+.text-input.invalid { border-color: var(--red); background: var(--red-soft); }
+.op-sym {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font-size: 26px;
+  font-weight: 900;
+}
+.op-card.on .op-sym { background: var(--blue); color: #ffffff; }
+.range { display: flex; gap: 12px; }
+.range label { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 800; color: var(--muted); }
+.switch-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+}
+.switch-row .label { margin-bottom: 0; }
+.switch-row .hint { margin-top: 2px; }
+.switch-row input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.switch {
+  position: relative;
+  width: 52px;
+  height: 30px;
+  flex: none;
+  border-radius: 99px;
+  background: var(--border);
+  transition: background-color 0.2s;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+.switch-row input:checked + .switch { background: var(--green); }
+.switch-row input:checked + .switch::after { transform: translateX(22px); }
+.switch-row input:focus-visible + .switch { outline: 3px solid var(--blue); outline-offset: 2px; }
+.error { min-height: 1.3em; margin: 0 0 10px; font-weight: 800; color: var(--red-ink); }
+
+/* ---------- History ---------- */
+.hist-summary { margin: 0 0 12px; font-size: 14px; font-weight: 800; color: var(--muted); }
+.history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.entry { display: flex; gap: 12px; padding: 10px 12px; border: 2px solid var(--border); border-radius: 14px; }
+.entry.empty { justify-content: center; color: var(--muted); font-weight: 800; }
+.badge {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 900;
+}
+.badge.ok { background: var(--green-soft); color: var(--green-ink); }
+.badge.bad { background: var(--red-soft); color: var(--red-ink); }
+.badge.muted { background: var(--surface-2); color: var(--muted); }
+.badge.info { background: var(--blue-soft); color: var(--blue-ink); }
+.entry-main { flex: 1; min-width: 0; }
+.entry-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; }
+.entry-title { font-weight: 900; color: var(--text-strong); overflow-wrap: anywhere; }
+.entry-time { font-size: 13px; font-weight: 700; color: var(--muted); }
+.entry-sub { margin-top: 2px; font-size: 14px; font-weight: 700; color: var(--muted); overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { padding: 3px 9px; border-radius: 99px; font-size: 13px; font-weight: 800; }
+.chip.ok { background: var(--green-soft); color: var(--green-ink); }
+.chip.bad { background: var(--red-soft); color: var(--red-ink); }
+
+/* ---------- Motion ---------- */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+@keyframes pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+@keyframes hop {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-12px); }
+  60% { transform: translateY(0); }
+  80% { transform: translateY(-4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 560px) {
+  .footer-inner { flex-direction: column; align-items: stretch; gap: 12px; }
+  #actionBtn { width: 100%; margin-left: 0; }
+  .fb-icon { width: 40px; height: 40px; font-size: 22px; }
+  .fb-title { font-size: 19px; }
+  .fb-sub { font-size: 15px; }
+  .stage { padding-bottom: 170px; }
+}
+@media (max-height: 760px) {
+  .stage { gap: 10px; }
+  .mascot { width: 60px; }
+  .bubble { margin-bottom: 22px; font-size: 16px; }
+  .key { height: 54px; font-size: 26px; }
+  .equation { font-size: clamp(36px, 10vw, 52px); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="streak is-zero" id="streak">
+      <span class="flame" aria-hidden="true">🔥</span><span id="streakNum">0</span>
+    </div>
+    <div class="progress" aria-hidden="true"><div class="progress-fill" id="progressFill"></div></div>
+    <button class="icon-btn" id="menuBtn" type="button" aria-label="Nastavení a historie" title="Nastavení a historie">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
+        <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+        <circle cx="9" cy="6" r="2.3" fill="currentColor"/><circle cx="15" cy="12" r="2.3" fill="currentColor"/><circle cx="8" cy="18" r="2.3" fill="currentColor"/>
+      </svg>
+    </button>
+  </header>
+
+  <main class="stage" id="stage">
+    <p class="greeting" id="greeting"></p>
+    <div class="task">
+      <div class="mascot" id="mascot" aria-hidden="true">
+        <svg viewBox="0 0 120 130">
+          <ellipse cx="60" cy="124" rx="36" ry="5" fill="rgba(0,0,0,0.12)"/>
+          <rect x="18" y="12" width="84" height="106" rx="24" fill="#1899d6"/>
+          <rect x="18" y="6" width="84" height="104" rx="24" fill="#1cb0f6"/>
+          <rect x="30" y="18" width="60" height="40" rx="12" fill="#ddf4ff"/>
+          <circle cx="47" cy="34" r="6.5" fill="#3c3c3c"/>
+          <circle cx="73" cy="34" r="6.5" fill="#3c3c3c"/>
+          <circle cx="49" cy="32" r="2.2" fill="#ffffff"/>
+          <circle cx="75" cy="32" r="2.2" fill="#ffffff"/>
+          <circle cx="38" cy="45" r="3.5" fill="#ffb3c0"/>
+          <circle cx="82" cy="45" r="3.5" fill="#ffb3c0"/>
+          <path class="m-happy" d="M51 44 Q60 53 69 44" stroke="#3c3c3c" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+          <path class="m-sad" d="M51 50 Q60 42 69 50" stroke="#3c3c3c" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+          <rect x="30" y="68" width="16" height="13" rx="4" fill="#ffffff"/>
+          <rect x="52" y="68" width="16" height="13" rx="4" fill="#ffffff"/>
+          <rect x="74" y="68" width="16" height="13" rx="4" fill="#ff9600"/>
+          <rect x="30" y="87" width="16" height="13" rx="4" fill="#ffffff"/>
+          <rect x="52" y="87" width="16" height="13" rx="4" fill="#ffffff"/>
+          <rect x="74" y="87" width="16" height="13" rx="4" fill="#58cc02"/>
+          <text x="38" y="79" font-family="Nunito, sans-serif" font-size="11" font-weight="900" fill="#1899d6" text-anchor="middle">+</text>
+          <text x="60" y="79" font-family="Nunito, sans-serif" font-size="11" font-weight="900" fill="#1899d6" text-anchor="middle">−</text>
+          <text x="38" y="98" font-family="Nunito, sans-serif" font-size="11" font-weight="900" fill="#1899d6" text-anchor="middle">·</text>
+          <text x="60" y="98" font-family="Nunito, sans-serif" font-size="11" font-weight="900" fill="#1899d6" text-anchor="middle">:</text>
+          <text x="82" y="98" font-family="Nunito, sans-serif" font-size="11" font-weight="900" fill="#ffffff" text-anchor="middle">=</text>
+        </svg>
+      </div>
+      <div class="bubble" id="bubble">Kolik je to?</div>
+    </div>
+
+    <div class="equation" id="equation" aria-live="polite">
+      <span id="exprText">? + ?</span><span>=</span><span class="answer empty" id="answerBox">?</span>
+    </div>
+
+    <div class="hearts" id="hearts" role="img" aria-label="Zbývající pokusy"></div>
+
+    <div class="keypad" id="keypad"></div>
+  </main>
+
+  <footer class="footer" id="footer">
+    <div class="footer-inner">
+      <div class="fb" id="fb" hidden>
+        <div class="fb-icon" id="fbIcon" aria-hidden="true"></div>
+        <div>
+          <div class="fb-title" id="fbTitle"></div>
+          <div class="fb-sub" id="fbSub"></div>
+        </div>
+      </div>
+      <button class="btn" id="actionBtn" type="button" disabled>Zkontrolovat</button>
+    </div>
+  </footer>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <h2 id="modalTitle">Vítej!</h2>
+      <button class="icon-btn" id="closeBtn" type="button" aria-label="Zavřít">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
+          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="tabs" id="tabs" role="tablist">
+      <button class="tab" id="tabSettings" type="button" role="tab" aria-selected="true" aria-controls="panelSettings">Nastavení</button>
+      <button class="tab" id="tabHistory" type="button" role="tab" aria-selected="false" aria-controls="panelHistory">Historie</button>
+    </div>
+
+    <section class="panel" id="panelSettings" role="tabpanel">
+      <p class="intro" id="introText">Ahoj! Než začneme, napiš své jméno a vyber, co budeme počítat a s jakými čísly.</p>
+      <label class="field">
+        <span class="label">Jak se jmenuješ?</span>
+        <input class="text-input" id="nameInput" type="text" maxlength="20" autocomplete="off" placeholder="Tvoje jméno">
+      </label>
+      <div class="field">
+        <span class="label" id="opsLabel">Co budeme počítat a s jakými čísly?</span>
+        <div class="op-list" id="opsList" role="group" aria-labelledby="opsLabel"></div>
+      </div>
+      <label class="switch-row" id="negRow">
+        <span>
+          <span class="label">Záporné výsledky</span>
+          <span class="hint">Výsledek může vyjít menší než nula</span>
+        </span>
+        <input type="checkbox" id="negInput">
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+      <p class="error" id="formError" role="alert"></p>
+      <button class="btn btn-block" id="saveBtn" type="button">Začít</button>
+    </section>
+
+    <section class="panel" id="panelHistory" role="tabpanel" hidden>
+      <p class="hist-summary" id="histSummary"></p>
+      <ol class="history" id="historyList"></ol>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Constants ----------
+  // All data lives under one key so the app can share a domain with other tools.
+  const STORAGE_KEY = 'elementary-school/basic-math-operations';
+  // Bump this and add a MIGRATIONS entry whenever the stored data shape changes.
+  const SCHEMA_VERSION = 1;
+  // Keys used by the first release, before data was scoped (treated as schema version 0).
+  const LEGACY_KEYS = { config: 'pocitani.config', log: 'pocitani.log', stats: 'pocitani.stats' };
+  const OP_ORDER = ['add', 'sub', 'mul', 'div'];
+  const OPS = {
+    add: { sym: '+', label: 'Sčítání' },
+    sub: { sym: '−', label: 'Odčítání' },
+    mul: { sym: '·', label: 'Násobení' },
+    div: { sym: ':', label: 'Dělení' }
+  };
+  const MAX_ATTEMPTS = 3;
+  const MILESTONE = 5;
+  const LIMIT = 1000;
+  const MAX_DIGITS = 7;
+  const DEFAULT_RANGE = { min: 0, max: 10 };
+  const DEFAULT_CONFIG = {
+    name: '',
+    ops: OP_ORDER.slice(),
+    ranges: Object.fromEntries(OP_ORDER.map((o) => [o, { ...DEFAULT_RANGE }])),
+    allowNegative: false
+  };
+  const PRAISE = ['Výborně!', 'Skvělá práce!', 'Paráda!', 'Správně!', 'Jen tak dál!', 'Super!'];
+  const RETRY = ['To není ono', 'Skoro!', 'Ještě jednou'];
+  const HEART_PATH = 'M12 21s-7.5-4.6-9.6-9.2C.9 8.5 2.8 4.5 6.6 4.5c2.2 0 3.7 1.2 5.4 3.1 1.7-1.9 3.2-3.1 5.4-3.1 3.8 0 5.7 4 4.2 7.3C19.5 16.4 12 21 12 21z';
+
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- Storage ----------
+  // Stored shape (schema version 1):
+  // {
+  //   schemaVersion: 1,
+  //   config: { name, ops: ['add'|'sub'|'mul'|'div'], ranges: { add: {min, max}, ... }, allowNegative } | null,
+  //   stats:  { streak, best },
+  //   log:    [ { type: 'exercise', id, op, a, b, answer, start, attempts: [{ value, time, ms, correct }], result, end }
+  //           | { type: 'config', time, action: 'set'|'change', config }
+  //           | { type: 'history_open', time } ]
+  // }
+  function readJson(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // MIGRATIONS[n] turns data at version n into data at version n + 1.
+  const MIGRATIONS = {
+    // 0 -> 1: three separate "pocitani.*" keys, possibly with one shared min/max, into one scoped object.
+    0: (old) => {
+      let config = old.config && typeof old.config === 'object' ? { ...old.config } : null;
+      if (config && !config.ranges && Number.isInteger(config.min) && Number.isInteger(config.max)) {
+        config.ranges = Object.fromEntries(OP_ORDER.map((o) => [o, { min: config.min, max: config.max }]));
+      }
+      if (config) { delete config.min; delete config.max; }
+      return { schemaVersion: 1, config, log: old.log, stats: old.stats };
+    }
+  };
+
+  // Set when the stored data comes from a newer version of the app; we then never overwrite it.
+  let readOnlyStorage = false;
+
+  function loadData() {
+    let data = readJson(STORAGE_KEY);
+    let fromLegacy = false;
+    if (!data || typeof data !== 'object') {
+      const legacy = { config: readJson(LEGACY_KEYS.config), log: readJson(LEGACY_KEYS.log), stats: readJson(LEGACY_KEYS.stats) };
+      fromLegacy = !!(legacy.config || legacy.log || legacy.stats);
+      data = fromLegacy ? { schemaVersion: 0, ...legacy } : { schemaVersion: SCHEMA_VERSION };
+    }
+    let version = Number.isInteger(data.schemaVersion) ? data.schemaVersion : 0;
+    if (version > SCHEMA_VERSION) {
+      readOnlyStorage = true;
+      console.warn(`Uložená data mají verzi ${version}, aplikace zná jen verzi ${SCHEMA_VERSION}. Data nebudou přepsána.`);
+      return { data: { schemaVersion: SCHEMA_VERSION }, fromLegacy: false };
+    }
+    while (version < SCHEMA_VERSION) {
+      data = MIGRATIONS[version](data);
+      version = data.schemaVersion;
+    }
+    return { data, fromLegacy };
+  }
+
+  function rangeOk(op, r) {
+    return !!r && Number.isInteger(r.min) && Number.isInteger(r.max) &&
+      r.min >= 0 && r.max <= LIMIT && r.min <= r.max && !(op === 'div' && r.max < 1);
+  }
+  function normalizeConfig(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const ranges = {};
+    OP_ORDER.forEach((o) => {
+      const r = raw.ranges && raw.ranges[o];
+      ranges[o] = r && Number.isInteger(r.min) && Number.isInteger(r.max) ? { min: r.min, max: r.max } : { ...DEFAULT_RANGE };
+    });
+    const c = {
+      name: String(raw.name || ''),
+      ops: OP_ORDER.filter((o) => Array.isArray(raw.ops) && raw.ops.includes(o)),
+      ranges,
+      allowNegative: !!raw.allowNegative
+    };
+    return c.ops.length && c.ops.every((o) => rangeOk(o, c.ranges[o])) ? c : null;
+  }
+
+  const loaded = loadData();
+  let config = normalizeConfig(loaded.data.config);
+  let log = Array.isArray(loaded.data.log) ? loaded.data.log.filter((e) => e && typeof e === 'object' && e.type) : [];
+  let stats = loaded.data.stats && typeof loaded.data.stats.streak === 'number'
+    ? { streak: loaded.data.stats.streak, best: loaded.data.stats.best || 0 }
+    : { streak: 0, best: 0 };
+
+  function persist() {
+    if (readOnlyStorage) return false;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION, config, stats, log }));
+      return true;
+    } catch (e) {
+      return false; // storage full or unavailable
+    }
+  }
+
+  const nowIso = () => new Date().toISOString();
+  const saveLog = persist;
+  const saveStats = persist;
+  const addLog = (entry) => { log.push(entry); persist(); };
+
+  // Any exercise left unfinished from a previous visit is marked as abandoned.
+  log.forEach((e) => {
+    if (e.type === 'exercise' && !e.result) {
+      const last = Array.isArray(e.attempts) && e.attempts[e.attempts.length - 1];
+      e.result = 'abandoned';
+      e.end = last ? last.time : e.start;
+    }
+  });
+  // Write the normalized, current-version data back; drop the old keys only once that succeeded.
+  if (persist() && loaded.fromLegacy) {
+    Object.values(LEGACY_KEYS).forEach((k) => { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } });
+  }
+
+  // ---------- Helpers ----------
+  const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+  const fmt = (n) => (n < 0 ? '−' : '') + Math.abs(n).toLocaleString('cs-CZ');
+  const exprOf = (e) => `${fmt(e.a)} ${OPS[e.op].sym} ${fmt(e.b)}`;
+  const seconds = (ms) => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
+  const fmtTime = (iso) => new Date(iso).toLocaleString('cs-CZ', {
+    day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+  const attemptsLeftText = (n) => (n === 1 ? 'zbývá 1 pokus' : `zbývají ${n} pokusy`);
+  const allowNeg = () => !!config && config.allowNegative && config.ops.includes('sub');
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  // ---------- Exercise generation ----------
+  // Operations come from a shuffled "deck" so each one appears equally often;
+  // numbers are drawn uniformly from the configured range.
+  let deck = [];
+  function drawOp() {
+    if (!deck.length) deck = shuffle(config.ops.slice());
+    return deck.pop();
+  }
+  function makeTask(op) {
+    const { min, max } = config.ranges[op];
+    const allowNegative = config.allowNegative;
+    let a, b, answer;
+    switch (op) {
+      case 'add':
+        a = randInt(min, max); b = randInt(min, max); answer = a + b; break;
+      case 'sub':
+        a = randInt(min, max); b = randInt(min, max);
+        if (!allowNegative && a < b) [a, b] = [b, a];
+        answer = a - b; break;
+      case 'mul':
+        a = randInt(min, max); b = randInt(min, max); answer = a * b; break;
+      case 'div': {
+        const q = randInt(min, max);
+        const d = randInt(Math.max(min, 1), max);
+        a = q * d; b = d; answer = q; break;
+      }
+    }
+    return { op, a, b, answer };
+  }
+  function lastExercise() {
+    for (let i = log.length - 1; i >= 0; i--) if (log[i].type === 'exercise') return log[i];
+    return null;
+  }
+
+  // ---------- Game state ----------
+  let cur = null;
+  let input = '';
+  let state = 'input'; // input | retry | passed | failed
+
+  function nextExercise() {
+    const op = drawOp();
+    const prev = lastExercise();
+    let t = makeTask(op);
+    for (let i = 0; i < 8 && prev && prev.op === t.op && prev.a === t.a && prev.b === t.b; i++) t = makeTask(op);
+    cur = {
+      type: 'exercise',
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      op: t.op, a: t.a, b: t.b, answer: t.answer,
+      start: nowIso(),
+      attempts: [],
+      result: null,
+      end: null
+    };
+    addLog(cur);
+    input = '';
+    const eq = $('equation');
+    eq.classList.toggle('long', exprOf(cur).length > 11);
+    $('exprText').textContent = exprOf(cur);
+    setState('input');
+  }
+
+  function wrongCount() { return cur ? cur.attempts.filter((a) => !a.correct).length : 0; }
+
+  function setState(s) {
+    state = s;
+    const footer = $('footer');
+    const btn = $('actionBtn');
+    const mascot = $('mascot');
+    const box = $('answerBox');
+    footer.className = 'footer' + (s === 'passed' ? ' is-ok' : (s === 'retry' || s === 'failed') ? ' is-bad' : '');
+    mascot.classList.remove('happy', 'sad');
+    box.classList.remove('ok', 'bad', 'focus');
+    $('fb').hidden = s === 'input';
+    btn.className = 'btn';
+
+    switch (s) {
+      case 'input':
+        btn.textContent = 'Zkontrolovat';
+        $('bubble').textContent = 'Kolik je to?';
+        box.classList.add('focus');
+        break;
+      case 'retry':
+        $('fbIcon').textContent = '✗';
+        $('fbTitle').textContent = pick(RETRY);
+        $('fbSub').textContent = `Zkus to znovu, ${attemptsLeftText(MAX_ATTEMPTS - wrongCount())}.`;
+        btn.textContent = 'Zkusit znovu';
+        btn.classList.add('btn-red');
+        $('bubble').textContent = 'Nevadí, zkus to ještě jednou!';
+        mascot.classList.add('sad');
+        box.classList.add('bad');
+        break;
+      case 'passed': {
+        const n = cur.attempts.length;
+        $('fbIcon').textContent = '✓';
+        $('fbTitle').textContent = pick(PRAISE);
+        $('fbSub').textContent = stats.streak > 0 && stats.streak % MILESTONE === 0
+          ? `Už ${stats.streak} příkladů správně v řadě! 🔥`
+          : (n === 1 ? 'Hned napoprvé!' : `Správně na ${n}. pokus.`);
+        btn.textContent = 'Pokračovat';
+        $('bubble').textContent = 'Hurá!';
+        void mascot.offsetWidth;
+        mascot.classList.add('happy');
+        box.classList.add('ok');
+        break;
+      }
+      case 'failed':
+        $('fbIcon').textContent = '✗';
+        $('fbTitle').textContent = 'Správná odpověď:';
+        $('fbSub').textContent = `${exprOf(cur)} = ${fmt(cur.answer)}`;
+        btn.textContent = 'Pokračovat';
+        btn.classList.add('btn-red');
+        $('bubble').textContent = 'Nevadí, příště to dáš!';
+        mascot.classList.add('sad');
+        box.classList.add('bad');
+        break;
+    }
+
+    const locked = s === 'passed' || s === 'failed';
+    document.querySelectorAll('#keypad .key').forEach((k) => { k.disabled = locked; });
+    renderInput();
+    renderHearts();
+  }
+
+  function isComplete() { return /^-?\d+$/.test(input); }
+
+  function renderInput() {
+    const box = $('answerBox');
+    if (input === '') {
+      box.textContent = '?';
+      box.classList.add('empty');
+    } else {
+      box.classList.remove('empty');
+      const neg = input.startsWith('-');
+      const digits = neg ? input.slice(1) : input;
+      box.textContent = (neg ? '−' : '') + (digits ? Number(digits).toLocaleString('cs-CZ') : '');
+    }
+    $('actionBtn').disabled = !cur || (state === 'input' && !isComplete());
+  }
+
+  function renderHearts() {
+    const wrap = $('hearts');
+    const left = MAX_ATTEMPTS - wrongCount();
+    wrap.textContent = '';
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('class', 'heart' + (i < left ? '' : ' lost'));
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', HEART_PATH);
+      path.setAttribute('fill', 'currentColor');
+      svg.appendChild(path);
+      wrap.appendChild(svg);
+    }
+    wrap.setAttribute('aria-label', `Zbývající pokusy: ${left}`);
+  }
+
+  function renderStreak(animate) {
+    const wrap = $('streak');
+    $('streakNum').textContent = stats.streak;
+    wrap.classList.toggle('is-zero', stats.streak === 0);
+    wrap.title = `Série správných odpovědí: ${stats.streak}. Nejlepší série: ${stats.best}.`;
+    if (animate) {
+      wrap.classList.remove('pop');
+      void wrap.offsetWidth;
+      wrap.classList.add('pop');
+    }
+    const fill = stats.streak === 0 ? 0 : (((stats.streak - 1) % MILESTONE) + 1) / MILESTONE;
+    $('progressFill').style.width = (fill * 100) + '%';
+  }
+
+  function renderGreeting() {
+    $('greeting').textContent = config && config.name ? `Ahoj, ${config.name}!` : 'Ahoj!';
+  }
+
+  function press(k) {
+    if (!cur) return;
+    if (state === 'retry') {
+      input = '';
+      setState('input');
+      if (k === 'back') return;
+    }
+    if (state !== 'input') return;
+    const neg = input.startsWith('-');
+    let digits = neg ? input.slice(1) : input;
+    if (k === 'back') {
+      if (digits) digits = digits.slice(0, -1);
+      else { input = ''; renderInput(); return; }
+    } else if (k === 'minus') {
+      if (!allowNeg()) return;
+      input = neg ? digits : '-' + digits;
+      renderInput();
+      return;
+    } else {
+      if (digits.length >= MAX_DIGITS) return;
+      digits = digits === '0' ? k : digits + k;
+    }
+    input = (neg ? '-' : '') + digits;
+    renderInput();
+  }
+
+  function check() {
+    if (state !== 'input' || !isComplete()) return;
+    const value = parseInt(input, 10);
+    const now = Date.now();
+    const correct = value === cur.answer;
+    cur.attempts.push({ value, time: new Date(now).toISOString(), ms: now - Date.parse(cur.start), correct });
+
+    if (correct) {
+      cur.result = 'passed';
+      cur.end = new Date(now).toISOString();
+      stats.streak += 1;
+      stats.best = Math.max(stats.best, stats.streak);
+      saveStats();
+      saveLog();
+      renderStreak(true);
+      setState('passed');
+      return;
+    }
+
+    if (wrongCount() >= MAX_ATTEMPTS) {
+      cur.result = 'failed';
+      cur.end = new Date(now).toISOString();
+      stats.streak = 0;
+      saveStats();
+      renderStreak(false);
+      saveLog();
+      setState('failed');
+    } else {
+      saveLog();
+      setState('retry');
+    }
+    const box = $('answerBox');
+    box.classList.remove('shake');
+    void box.offsetWidth;
+    box.classList.add('shake');
+  }
+
+  function onAction() {
+    if (state === 'input') check();
+    else if (state === 'retry') { input = ''; setState('input'); }
+    else nextExercise();
+  }
+
+  // ---------- Keypad ----------
+  const BACK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><line x1="17" y1="9" x2="12" y2="14"/><line x1="12" y1="9" x2="17" y2="14"/></svg>';
+  const keyButtons = {};
+  function buildKeypad() {
+    const pad = $('keypad');
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'minus', '0', 'back'].forEach((k) => {
+      const b = el('button', 'key');
+      b.type = 'button';
+      b.dataset.k = k;
+      if (k === 'back') { b.innerHTML = BACK_SVG; b.setAttribute('aria-label', 'Smazat'); }
+      else if (k === 'minus') { b.textContent = '−'; b.setAttribute('aria-label', 'Mínus'); }
+      else b.textContent = k;
+      b.addEventListener('click', () => press(k));
+      keyButtons[k] = b;
+      pad.appendChild(b);
+    });
+  }
+  function updateMinusKey() { keyButtons.minus.classList.toggle('invisible', !allowNeg()); }
+  function flashKey(k) {
+    const b = keyButtons[k];
+    if (!b || b.disabled) return;
+    b.classList.add('pressed');
+    setTimeout(() => b.classList.remove('pressed'), 110);
+  }
+
+  // ---------- Modal: settings & history ----------
+  let modalMode = null; // 'intro' | 'menu'
+  const opUI = {};
+
+  function buildOps() {
+    const list = $('opsList');
+    OP_ORDER.forEach((o) => {
+      const card = el('div', 'op-card');
+      const toggle = el('button', 'op-toggle');
+      toggle.type = 'button';
+      toggle.setAttribute('aria-pressed', 'false');
+      toggle.setAttribute('aria-controls', 'opBody-' + o);
+      toggle.append(el('span', 'op-sym', OPS[o].sym), el('span', 'op-name', OPS[o].label), el('span', 'op-check', '✓'));
+
+      const body = el('div', 'op-body');
+      body.id = 'opBody-' + o;
+      const range = el('div', 'range');
+      const makeInput = (text) => {
+        const label = el('label', '', text + ' ');
+        const input = el('input', 'text-input');
+        input.type = 'number';
+        input.inputMode = 'numeric';
+        input.min = '0';
+        input.max = String(LIMIT);
+        input.step = '1';
+        input.setAttribute('aria-label', `${OPS[o].label}: ${text.toLowerCase()}`);
+        input.addEventListener('input', () => input.classList.remove('invalid'));
+        label.appendChild(input);
+        range.appendChild(label);
+        return input;
+      };
+      const minInput = makeInput('Od');
+      const maxInput = makeInput('Do');
+      body.appendChild(range);
+      if (o === 'div') body.appendChild(el('p', 'hint', 'Rozsah platí pro dělitele a výsledek, takže dělení vždy vyjde beze zbytku.'));
+      if (o === 'sub') body.appendChild($('negRow'));
+
+      toggle.addEventListener('click', () => setOpOn(o, toggle.getAttribute('aria-pressed') !== 'true'));
+      card.append(toggle, body);
+      list.appendChild(card);
+      opUI[o] = { card, toggle, body, min: minInput, max: maxInput };
+    });
+  }
+  function setOpOn(o, on) {
+    const u = opUI[o];
+    u.toggle.setAttribute('aria-pressed', String(on));
+    u.toggle.setAttribute('aria-expanded', String(on));
+    u.card.classList.toggle('on', on);
+    u.body.hidden = !on;
+  }
+
+  function openModal(mode) {
+    modalMode = mode;
+    const c = config || DEFAULT_CONFIG;
+    $('nameInput').value = c.name;
+    OP_ORDER.forEach((o) => {
+      const r = c.ranges[o] || DEFAULT_RANGE;
+      const u = opUI[o];
+      u.min.value = r.min;
+      u.max.value = r.max;
+      u.min.classList.remove('invalid');
+      u.max.classList.remove('invalid');
+      setOpOn(o, c.ops.includes(o));
+    });
+    $('negInput').checked = !!c.allowNegative;
+    $('formError').textContent = '';
+    const intro = mode === 'intro';
+    $('closeBtn').hidden = intro;
+    $('tabs').hidden = intro;
+    $('introText').hidden = !intro;
+    $('saveBtn').textContent = intro ? 'Začít' : 'Uložit';
+    showTab('settings');
+    $('overlay').hidden = false;
+    document.body.classList.add('modal-open');
+  }
+  function closeModal() {
+    $('overlay').hidden = true;
+    document.body.classList.remove('modal-open');
+    modalMode = null;
+  }
+  function showTab(name) {
+    const hist = name === 'history';
+    $('tabSettings').setAttribute('aria-selected', String(!hist));
+    $('tabHistory').setAttribute('aria-selected', String(hist));
+    $('panelSettings').hidden = hist;
+    $('panelHistory').hidden = !hist;
+    $('modalTitle').textContent = modalMode === 'intro' ? 'Vítej!' : (hist ? 'Historie' : 'Nastavení');
+    if (hist) {
+      addLog({ type: 'history_open', time: nowIso() });
+      renderHistory();
+      const panel = $('panelHistory');
+      panel.scrollTop = panel.scrollHeight;
+    }
+  }
+
+  function parseWhole(v) {
+    const s = String(v).trim();
+    return /^\d+$/.test(s) ? parseInt(s, 10) : null;
+  }
+  function onSave() {
+    const name = $('nameInput').value.trim().replace(/\s+/g, ' ').slice(0, 20);
+    const ops = OP_ORDER.filter((o) => opUI[o].toggle.getAttribute('aria-pressed') === 'true');
+    const prev = config || DEFAULT_CONFIG;
+    const ranges = {};
+    let err = '';
+    if (!ops.length) err = 'Vyber alespoň jednu početní operaci.';
+
+    for (const o of OP_ORDER) {
+      const u = opUI[o];
+      const r = { min: parseWhole(u.min.value), max: parseWhole(u.max.value) };
+      if (!ops.includes(o)) {
+        // Hidden operations keep their last valid range.
+        ranges[o] = rangeOk(o, r) ? r : { ...(prev.ranges[o] || DEFAULT_RANGE) };
+        continue;
+      }
+      if (err) { ranges[o] = r; continue; }
+      let msg = '';
+      const bad = [];
+      if (r.min === null || r.min > LIMIT) bad.push(u.min);
+      if (r.max === null || r.max > LIMIT) bad.push(u.max);
+      if (bad.length) msg = `zadej celá čísla od 0 do ${LIMIT}.`;
+      else if (r.min > r.max) { msg = 'číslo „Od“ nesmí být větší než číslo „Do“.'; bad.push(u.min, u.max); }
+      else if (o === 'div' && r.max < 1) { msg = 'číslo „Do“ musí být alespoň 1.'; bad.push(u.max); }
+      if (msg) {
+        err = `${OPS[o].label}: ${msg}`;
+        bad.forEach((i) => i.classList.add('invalid'));
+      }
+      ranges[o] = r;
+    }
+    if (err) { $('formError').textContent = err; return; }
+    applyConfig({ name, ops, ranges, allowNegative: $('negInput').checked });
+  }
+
+  function mathKey(c) {
+    return JSON.stringify({
+      ops: c.ops,
+      ranges: c.ops.map((o) => [c.ranges[o].min, c.ranges[o].max]),
+      negative: c.ops.includes('sub') && c.allowNegative
+    });
+  }
+  function applyConfig(next) {
+    const first = !config;
+    const mathChanged = first || mathKey(config) !== mathKey(next);
+    if (!first && JSON.stringify(config) === JSON.stringify(next)) { closeModal(); return; }
+
+    if (!first && mathChanged && cur && !cur.result) {
+      cur.result = 'abandoned';
+      cur.end = nowIso();
+      saveLog();
+    }
+    config = next;
+    persist();
+    addLog({ type: 'config', time: nowIso(), action: first ? 'set' : 'change', config: JSON.parse(JSON.stringify(next)) });
+    renderGreeting();
+    updateMinusKey();
+    closeModal();
+    if (mathChanged) {
+      deck = [];
+      nextExercise();
+    }
+  }
+
+  function describeConfig(c) {
+    const ops = c.ops || [];
+    const parts = ops.map((o) => {
+      const r = (c.ranges && c.ranges[o]) || { min: c.min, max: c.max };
+      return `${OPS[o] ? OPS[o].sym : o} ${r.min}–${r.max}`;
+    });
+    let text = `Jméno: ${c.name || '(bez jména)'}; ${parts.join(', ')}`;
+    if (ops.includes('sub')) text += `; záporné výsledky: ${c.allowNegative ? 'ano' : 'ne'}`;
+    return text;
+  }
+
+  function renderEntry(e) {
+    const li = el('li', 'entry');
+    const main = el('div', 'entry-main');
+    const top = el('div', 'entry-top');
+    let badge;
+
+    if (e.type === 'exercise') {
+      const attempts = Array.isArray(e.attempts) ? e.attempts : [];
+      const map = {
+        passed: ['ok', '✓', attempts.length === 1 ? 'Splněno napoprvé' : `Splněno na ${attempts.length}. pokus`],
+        failed: ['bad', '✗', 'Nesplněno'],
+        abandoned: ['muted', '–', 'Nedokončeno']
+      };
+      const [cls, sym, label] = map[e.result] || ['info', '…', 'Právě probíhá'];
+      badge = el('div', 'badge ' + cls, sym);
+      top.appendChild(el('span', 'entry-title', OPS[e.op] ? `${exprOf(e)} = ${fmt(e.answer)}` : 'Příklad'));
+      top.appendChild(el('span', 'entry-time', fmtTime(e.start)));
+      main.appendChild(top);
+      main.appendChild(el('div', 'entry-sub', `${OPS[e.op] ? OPS[e.op].label : ''}: ${label}`));
+      if (attempts.length) {
+        const chips = el('div', 'chips');
+        attempts.forEach((a, i) => {
+          chips.appendChild(el('span', 'chip ' + (a.correct ? 'ok' : 'bad'),
+            `${i + 1}. pokus: ${fmt(a.value)} ${a.correct ? '✓' : '✗'}, za ${seconds(a.ms)}`));
+        });
+        main.appendChild(chips);
+      }
+    } else if (e.type === 'config') {
+      badge = el('div', 'badge info', '⚙');
+      top.appendChild(el('span', 'entry-title', e.action === 'set' ? 'Nastavení uloženo' : 'Nastavení změněno'));
+      top.appendChild(el('span', 'entry-time', fmtTime(e.time)));
+      main.appendChild(top);
+      if (e.config) main.appendChild(el('div', 'entry-sub', describeConfig(e.config)));
+    } else if (e.type === 'history_open') {
+      badge = el('div', 'badge muted', '🕘');
+      top.appendChild(el('span', 'entry-title', 'Otevřena historie'));
+      top.appendChild(el('span', 'entry-time', fmtTime(e.time)));
+      main.appendChild(top);
+    } else {
+      return null;
+    }
+    li.appendChild(badge);
+    li.appendChild(main);
+    return li;
+  }
+
+  function renderHistory() {
+    const list = $('historyList');
+    list.textContent = '';
+    $('histSummary').textContent = `Záznamů: ${log.length}. Nejlepší série: ${stats.best}.`;
+    if (!log.length) {
+      list.appendChild(el('li', 'entry empty', 'Zatím tu nic není.'));
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    log.forEach((e) => {
+      const node = renderEntry(e);
+      if (node) frag.appendChild(node);
+    });
+    list.appendChild(frag);
+  }
+
+  // ---------- Events ----------
+  $('actionBtn').addEventListener('click', onAction);
+  $('menuBtn').addEventListener('click', () => openModal('menu'));
+  $('closeBtn').addEventListener('click', () => { if (modalMode === 'menu') closeModal(); });
+  $('overlay').addEventListener('click', (ev) => { if (ev.target === ev.currentTarget && modalMode === 'menu') closeModal(); });
+  $('tabSettings').addEventListener('click', () => { if ($('panelSettings').hidden) showTab('settings'); });
+  $('tabHistory').addEventListener('click', () => { if ($('panelHistory').hidden) showTab('history'); });
+  $('saveBtn').addEventListener('click', onSave);
+
+  document.addEventListener('keydown', (ev) => {
+    if (!$('overlay').hidden) {
+      if (ev.key === 'Escape' && modalMode === 'menu') closeModal();
+      else if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') { ev.preventDefault(); onSave(); }
+      return;
+    }
+    if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    let k = null;
+    if (/^[0-9]$/.test(ev.key)) k = ev.key;
+    else if (ev.key === 'Backspace') k = 'back';
+    else if (ev.key === '-' || ev.key === 'Subtract') k = 'minus';
+    if (k) {
+      ev.preventDefault();
+      flashKey(k);
+      press(k);
+    } else if (ev.key === 'Enter') {
+      ev.preventDefault();
+      const b = $('actionBtn');
+      if (!b.disabled) b.click();
+    }
+  });
+
+  // ---------- Start ----------
+  buildKeypad();
+  buildOps();
+  renderStreak(false);
+  renderHearts();
+  if (config) {
+    renderGreeting();
+    updateMinusKey();
+    nextExercise();
+  } else {
+    renderGreeting();
+    keyButtons.minus.classList.add('invisible');
+    openModal('intro');
+  }
+})();
+</script>
+</body>
+</html>
